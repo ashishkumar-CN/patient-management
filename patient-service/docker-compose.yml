@@ -1,0 +1,100 @@
+# =============================================================================
+# DOCKER COMPOSE CONFIGURATION FOR PATIENT SERVICE
+# =============================================================================
+# This file defines multiple containers (services) that work together:
+# 1. PostgreSQL database
+# 2. Patient Service Spring Boot application
+#
+# Usage:
+#   docker-compose up --build    # Build and start all services
+#   docker-compose down           # Stop and remove containers
+#   docker-compose down -v        # Stop, remove containers AND volumes (deletes data!)
+#   docker-compose logs -f        # Follow logs from all services
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # POSTGRESQL DATABASE SERVICE
+  # ---------------------------------------------------------------------------
+  # This container runs the PostgreSQL database server
+  # The patient-service connects to this container using the service name 'postgres'
+  
+  postgres:
+    # Use the official PostgreSQL image from Docker Hub
+    image: postgres:latest
+    
+    # Give the container a specific name (makes it easier to reference)
+    container_name: patient-postgres
+    
+    # Environment variables to configure PostgreSQL on first run
+    # These create the database and user automatically
+    environment:
+      POSTGRES_DB: patientdb        # Database name to create
+      POSTGRES_USER: ashish         # Username for database access
+      POSTGRES_PASSWORD: 123456     # Password (use secrets in production!)
+    
+    # Port mapping: HOST_PORT:CONTAINER_PORT
+    # Allows connecting to PostgreSQL from your local machine
+    # e.g., pgAdmin can connect to localhost:5433
+    # Using 5433 to avoid conflict with local PostgreSQL on 5432
+    ports:
+      - "5433:5432"
+    
+    # Named volume for data persistence
+    # Data survives container restarts and rebuilds
+    # Mount at /var/lib/postgresql for PostgreSQL 18+ compatibility
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    
+    # Health check to verify PostgreSQL is ready to accept connections
+    # Other services wait for this before starting (see depends_on)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ashish -d patientdb"]
+      interval: 10s    # Check every 10 seconds
+      timeout: 5s      # Fail if check takes longer than 5 seconds
+      retries: 5       # Mark unhealthy after 5 consecutive failures
+
+  # ---------------------------------------------------------------------------
+  # PATIENT SERVICE (SPRING BOOT APPLICATION)
+  # ---------------------------------------------------------------------------
+  # This container runs our Spring Boot application
+  # It connects to the PostgreSQL container above
+  
+  patient-service:
+    # Build the image from Dockerfile in current directory
+    # This runs the multi-stage build defined in ./Dockerfile
+    build: .
+    
+    # Container name for easy identification
+    container_name: patient-service
+    
+    # Port mapping for the Spring Boot application
+    # Access the API at http://localhost:4000
+    ports:
+      - "4000:4000"
+    
+    # Environment variables passed to the Spring Boot application
+    # These override values in application.properties
+    # DB_HOST uses 'postgres' - the service name above (Docker DNS resolves this)
+    environment:
+      DB_HOST: postgres             # Docker service name (not localhost!)
+      DB_PORT: 5432
+      DB_NAME: patientdb
+      DB_USER: ashish
+      DB_PASSWORD: 123456
+    
+    # Service dependency configuration
+    # Ensures PostgreSQL is healthy before starting patient-service
+    # This prevents connection errors on startup
+    depends_on:
+      postgres:
+        condition: service_healthy  # Wait for healthcheck to pass
+
+# -----------------------------------------------------------------------------
+# NAMED VOLUMES
+# -----------------------------------------------------------------------------
+# Volumes persist data outside of containers
+# Data remains even if containers are deleted (unless using 'docker-compose down -v')
+
+volumes:
+  postgres_data:    # Stores PostgreSQL database files

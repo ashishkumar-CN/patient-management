@@ -7,6 +7,8 @@ import com.pm.patient_service.dto.PatientResponseDTO;import com.pm.patient_servi
 import jakarta.validation.Valid;
 import com.pm.patient_service.service.PatientService;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 @RestController
 @RequestMapping("/patients")
+@Tag(name = "Patient Management", description = "APIs for managing patients")
 public class PatientController {
     
     private PatientService patientService;
